@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Tide Chart</title>
+
+<!-- Makes it feel like a native app when added to the iPhone Home Screen -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tide Chart">
+<meta name="theme-color" content="#0B2E4F">
+
+<!-- Home Screen icon (simple wave glyph, generated inline so no extra file is needed) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='36' fill='%230B2E4F'/%3E%3Cpath d='M20 100 Q45 80 70 100 T120 100 T170 100' stroke='%233FA79E' stroke-width='10' fill='none' stroke-linecap='round'/%3E%3Cpath d='M20 130 Q45 110 70 130 T120 130 T170 130' stroke='%23E0A458' stroke-width='10' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #EDF3F2;
+    /* Respect the iPhone notch / home indicator safe areas */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+</style>
+</head>
+<body>
+<style>
+  .tide-tool {
+    --navy: #0B2E4F;
+    --navy-deep: #071D33;
+    --seafoam: #3FA79E;
+    --seafoam-light: #DCEEEC;
+    --sand: #E8DCC4;
+    --amber: #E0A458;
+    --sun-yellow: #F0C43B;
+    --moon-blue: #94B4C7;
+    --now-dot: #1D5FD6;
+    --bg: #EDF3F2;
+    --ink: #16323F;
+    --ink-soft: #567077;
+    --line: #C7D6D4;
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 28px 20px 40px;
+    min-height: 100%;
+    box-sizing: border-box;
+  }
+  .tide-tool * { box-sizing: border-box; }
+  .tt-card {
+    max-width: 780px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(11,46,79,0.06);
+  }
+  .tt-header {
+    background: var(--navy);
+    background-image: linear-gradient(160deg, var(--navy) 0%, var(--navy-deep) 100%);
+    color: var(--sand);
+    padding: 22px 26px 20px;
+    position: relative;
+  }
+  .tt-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--seafoam);
+    margin: 0 0 6px;
+  }
+  .tt-title {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .tt-sub {
+    font-size: 13px;
+    color: #AFC6C9;
+    margin: 6px 0 0;
+  }
+  .tt-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 18px 26px;
+    background: var(--seafoam-light);
+    border-bottom: 1px solid var(--line);
+    align-items: flex-end;
+  }
+  .tt-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 150px; }
+  .tt-field label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .tt-field select, .tt-field input {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--ink);
+  }
+  .tt-field select:focus, .tt-field input:focus {
+    outline: 2px solid var(--seafoam);
+    outline-offset: 1px;
+  }
+  .tt-btn {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 9px 18px;
+    background: var(--seafoam);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+  }
+  .tt-btn:hover { background: #328c84; }
+  .tt-btn:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+  .tt-body { padding: 22px 26px 26px; }
+  .tt-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin: 4px 0 18px;
+    min-height: 16px;
+  }
+  .tt-status.error { color: #B4483A; }
+  .tt-chart-wrap { margin-bottom: 22px; }
+  .tt-legend {
+    display: flex;
+    gap: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+  .tt-legend span { display: flex; align-items: center; gap: 5px; }
+  .tt-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .tt-swatch { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
+  table.tt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+  }
+  table.tt-table th {
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    font-weight: 600;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--navy);
+  }
+  table.tt-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  table.tt-table tr:last-child td { border-bottom: none; }
+  .tt-source {
+    margin-top: 16px;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .tt-source a { color: var(--navy); }
+  .tt-now {
+    margin: 4px 0 22px;
+    padding: 18px 20px;
+    background: var(--seafoam-light);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .tt-now-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--navy);
+    flex-basis: 100%;
+    margin: 0 0 4px;
+  }
+  .tt-now-value {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 40px;
+    font-weight: 600;
+    color: var(--navy);
+    line-height: 1;
+  }
+  .tt-now-arrow {
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 700;
+  }
+  .tt-now-arrow.rising { color: #2E9E5B; }
+  .tt-now-arrow.falling { color: #C23B2E; }
+  .tt-now-trend {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .tt-now-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    flex-basis: 100%;
+  }
+</style>
+
+<div class="tide-tool">
+  <div class="tt-card">
+    <div class="tt-header">
+      <p class="tt-eyebrow">NOAA · CO-OPS Tide Predictions</p>
+      <h1 class="tt-title">Tide Chart</h1>
+      <p class="tt-sub">Hourly water height, sun &amp; moon position, and live tide status</p>
+    </div>
+
+    <div class="tt-controls">
+      <div class="tt-field">
+        <label for="tt-station">Station</label>
+        <select id="tt-station">
+          <option value="8413564">Southwest Harbor, ME</option>
+          <option value="8413320">Bar Harbor, ME</option>
+          <option value="8411060">Cutler Farris Wharf, ME</option>
+          <option value="8410140">Eastport, ME</option>
+          <option value="8418150">Portland, ME</option>
+          <option value="8419317">Wells, ME</option>
+          <option value="8443970">Boston, MA</option>
+          <option value="8447930">Woods Hole, MA</option>
+          <option value="8518750">The Battery, NY</option>
+          <option value="custom">Custom station ID…</option>
+        </select>
+      </div>
+      <div class="tt-field" id="tt-custom-wrap" style="display:none;">
+        <label for="tt-custom-id">NOAA Station ID</label>
+        <input id="tt-custom-id" type="text" placeholder="e.g. 8413320" />
+      </div>
+      <div class="tt-field">
+        <label for="tt-date">Date</label>
+        <input id="tt-date" type="date" />
+      </div>
+      <button class="tt-btn" id="tt-fetch">Get tide data</button>
+    </div>
+
+    <div class="tt-body">
+      <p class="tt-status" id="tt-status">Pick a station and date, then get tide data.</p>
+      <div class="tt-now" id="tt-now-wrap" style="display:none;"></div>
+      <div class="tt-chart-wrap" id="tt-chart-wrap"></div>
+      <div id="tt-table-wrap"></div>
+      <p class="tt-source">Source: NOAA Tides &amp; Currents CO-OPS API (MLLW datum) and sunrisesunset.io for sun/moon times. Predictions only, not real-time observations. Auto-refreshes every 10 minutes.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const stationSel = document.getElementById('tt-station');
+  const customWrap = document.getElementById('tt-custom-wrap');
+  const customInput = document.getElementById('tt-custom-id');
+  const dateInput = document.getElementById('tt-date');
+  const fetchBtn = document.getElementById('tt-fetch');
+  const statusEl = document.getElementById('tt-status');
+  const chartWrap = document.getElementById('tt-chart-wrap');
+  const nowWrap = document.getElementById('tt-now-wrap');
+  const tableWrap = document.getElementById('tt-table-wrap');
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function toLocalDateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+  function fmtClock(d) {
+    let hh = d.getHours();
+    const mm = pad(d.getMinutes());
+    const ampm = hh >= 12 ? 'PM' : 'AM';
+    hh = hh % 12;
+    if (hh === 0) hh = 12;
+    return `${hh}:${mm} ${ampm}`;
+  }
+
+  dateInput.value = toLocalDateStr(new Date());
+
+  stationSel.addEventListener('change', () => {
+    customWrap.style.display = stationSel.value === 'custom' ? 'flex' : 'none';
+  });
+
+  // Some NOAA stations (e.g. Southwest Harbor) are "subordinate stations":
+  // they don't have their own harmonic predictions in the API, only a
+  // published time/height offset from a nearby reference station.
+  const SUBORDINATE_STATIONS = {
+    '8413564': {
+      name: 'Southwest Harbor, ME',
+      refId: '8413320',
+      refName: 'Bar Harbor, ME',
+      highTimeOffsetMin: 0,
+      lowTimeOffsetMin: -27,
+      highHeightFactor: 0.96,
+      lowHeightFactor: 0.95
+    }
+  };
+
+  const stationCoordsCache = {};
+
+  function interpolateAt(points, targetDate) {
+    if (targetDate <= points[0].time) return points[0].v;
+    if (targetDate >= points[points.length - 1].time) return points[points.length - 1].v;
+    for (let i = 0; i < points.length - 1; i++) {
+      if (points[i].time <= targetDate && targetDate <= points[i + 1].time) {
+        const span = points[i + 1].time - points[i].time;
+        const frac = span > 0 ? (targetDate - points[i].time) / span : 0;
+        return points[i].v + (points[i + 1].v - points[i].v) * frac;
+      }
+    }
+    return points[points.length - 1].v;
+  }
+
+  async function getStationCoords(stationId) {
+    if (stationCoordsCache[stationId]) return stationCoordsCache[stationId];
+    try {
+      const res = await fetch(`https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${stationId}.json`);
+      const json = await res.json();
+      const st = json.stations && json.stations[0];
+      if (!st) return null;
+      const coords = { lat: st.lat, lng: st.lng };
+      stationCoordsCache[stationId] = coords;
+      return coords;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function parseHM(s) {
+    if (!s) return null;
+    const parts = s.split(':').map(Number);
+    const hh = parts[0], mm = parts[1] || 0, ss = parts[2] || 0;
+    return hh + mm / 60 + ss / 3600;
+  }
+
+  async function fetchAstronomy(lat, lng, dateStr) {
+    try {
+      const url = `https://api.sunrisesunset.io/json?lat=${lat}&lng=${lng}&date=${dateStr}&time_format=24`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.status !== 'OK') return null;
+      const r = json.results;
+      return {
+        sunrise: parseHM(r.sunrise),
+        sunset: parseHM(r.sunset),
+        moonrise: parseHM(r.moonrise),
+        moonset: parseHM(r.moonset)
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function sunSegments(astro) {
+    if (!astro || astro.sunrise == null || astro.sunset == null) return [];
+    if (astro.sunrise <= astro.sunset) return [[astro.sunrise, astro.sunset]];
+    return [];
+  }
+
+  function moonSegments(astro) {
+    if (!astro) return [];
+    const { moonrise, moonset } = astro;
+    if (moonrise != null && moonset != null) {
+      if (moonrise < moonset) return [[moonrise, moonset]];
+      return [[0, moonset], [moonrise, 24]];
+    } else if (moonrise == null && moonset != null) {
+      return [[0, moonset]];
+    } else if (moonset == null && moonrise != null) {
+      return [[moonrise, 24]];
+    }
+    return [];
+  }
+
+  function buildChart(hourly, hilo, unit, extras) {
+    extras = extras || {};
+    const sunSeg = extras.sunSeg || [];
+    const moonSegs = extras.moonSegs || [];
+    const nowPoint = extras.nowPoint || null;
+
+    const w = 700;
+    const padL = 42, padR = 16, padT = 36;
+    const plotH = 170;
+    const chartBottomY = padT + plotH;
+    const hourLabelY = chartBottomY + 16;
+    const sunTrackY = hourLabelY + 14;
+    const moonTrackY = sunTrackY + 20;
+    const svgH = moonTrackY + 18;
+
+    const heights = hourly.map(p => p.v);
+    const minV = Math.min(...heights, ...hilo.map(p => p.v)) - 0.5;
+    const maxV = Math.max(...heights, ...hilo.map(p => p.v)) + 0.5;
+    const xFor = i => padL + (i / (hourly.length - 1)) * (w - padL - padR);
+    const yFor = v => padT + (1 - (v - minV) / (maxV - minV)) * plotH;
+
+    let path = '';
+    hourly.forEach((p, i) => {
+      const x = xFor(i), y = yFor(p.v);
+      path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+    });
+
+    let gridLines = '';
+    const hourStep = 3;
+    for (let i = 0; i < hourly.length; i += hourStep) {
+      const x = xFor(i);
+      gridLines += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${chartBottomY}" stroke="#C7D6D4" stroke-width="1" stroke-dasharray="2,3"/>`;
+      gridLines += `<text x="${x}" y="${hourLabelY}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="middle">${hourly[i].hourLabel}</text>`;
+    }
+
+    const zeroY = yFor(0);
+    const zeroLine = (minV < 0 && maxV > 0)
+      ? `<line x1="${padL}" y1="${zeroY}" x2="${w-padR}" y2="${zeroY}" stroke="#0B2E4F" stroke-width="1" stroke-dasharray="1,3" opacity="0.4"/>`
+      : '';
+
+    let hiloMarks = '';
+    hilo.forEach(p => {
+      const x = padL + (p.hourIndex / (hourly.length - 1)) * (w - padL - padR);
+      const y = yFor(p.v);
+      const color = p.type === 'H' ? '#3FA79E' : '#E0A458';
+      hiloMarks += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+      hiloMarks += `<text x="${x.toFixed(1)}" y="${(y - 24).toFixed(1)}" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="${color}" text-anchor="middle">${p.v.toFixed(2)}${unit}</text>`;
+      if (p.timeLabel) {
+        hiloMarks += `<text x="${x.toFixed(1)}" y="${(y - 11).toFixed(1)}" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600" fill="${color}" text-anchor="middle">${p.timeLabel}</text>`;
+      }
+    });
+
+    let yTicks = '';
+    const ticks = 4;
+    for (let i = 0; i <= ticks; i++) {
+      const v = minV + (i / ticks) * (maxV - minV);
+      const y = yFor(v);
+      yTicks += `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#E5EDEC" stroke-width="1"/>`;
+      yTicks += `<text x="${padL - 8}" y="${y + 3}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="end">${v.toFixed(1)}</text>`;
+    }
+
+    const xForHour = t => padL + (t / (hourly.length - 1)) * (w - padL - padR);
+
+    let sunTrack = `<line x1="${padL}" y1="${sunTrackY}" x2="${w-padR}" y2="${sunTrackY}" stroke="#E5EDEC" stroke-width="5" stroke-linecap="round"/>`;
+    sunSeg.forEach(seg => {
+      const x1 = xForHour(seg[0]), x2 = xForHour(seg[1]);
+      sunTrack += `<line x1="${x1.toFixed(1)}" y1="${sunTrackY}" x2="${x2.toFixed(1)}" y2="${sunTrackY}" stroke="var(--sun-yellow)" stroke-width="5" stroke-linecap="round"/>`;
+    });
+    sunTrack += `<text x="${padL - 8}" y="${sunTrackY + 3}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="end">Sun</text>`;
+
+    let moonTrack = `<line x1="${padL}" y1="${moonTrackY}" x2="${w-padR}" y2="${moonTrackY}" stroke="#E5EDEC" stroke-width="5" stroke-linecap="round"/>`;
+    moonSegs.forEach(seg => {
+      const x1 = xForHour(seg[0]), x2 = xForHour(seg[1]);
+      moonTrack += `<line x1="${x1.toFixed(1)}" y1="${moonTrackY}" x2="${x2.toFixed(1)}" y2="${moonTrackY}" stroke="var(--moon-blue)" stroke-width="5" stroke-linecap="round"/>`;
+    });
+    moonTrack += `<text x="${padL - 8}" y="${moonTrackY + 3}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="end">Moon</text>`;
+
+    let nowMark = '';
+    if (nowPoint) {
+      const x = xForHour(nowPoint.hourFrac);
+      const y = yFor(nowPoint.v);
+      nowMark = `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" fill="var(--now-dot)" opacity="0.18"/>
+        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="var(--now-dot)" stroke="#fff" stroke-width="2"/>`;
+    }
+
+    return `<svg viewBox="0 0 ${w} ${svgH}" style="width:100%;height:auto;display:block;">
+      <style>text{font-variant-numeric:tabular-nums;}</style>
+      ${yTicks}
+      ${gridLines}
+      ${zeroLine}
+      <path d="${path}" fill="none" stroke="#0B2E4F" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>
+      ${hiloMarks}
+      ${nowMark}
+      ${sunTrack}
+      ${moonTrack}
+    </svg>`;
+  }
+
+  function buildTable(hourly, unit) {
+    let rows = hourly.map(p => {
+      return `<tr><td>${p.hourLabel}</td><td>${p.v.toFixed(2)} ${unit}</td></tr>`;
+    }).join('');
+    return `<table class="tt-table">
+      <thead><tr><th>Hour</th><th>Predicted Height</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  async function updateTideNow(stationId) {
+    if (!stationId) { nowWrap.style.display = 'none'; return; }
+    const sub = SUBORDINATE_STATIONS[stationId];
+    const fetchStationId = sub ? sub.refId : stationId;
+    const base = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+    const url = `${base}?product=predictions&interval=6&station=${encodeURIComponent(fetchStationId)}&begin_date=${todayStr}&end_date=${todayStr}&datum=MLLW&time_zone=lst_ldt&units=english&application=tide_chart_tool&format=json`;
+
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.error || !json.predictions || json.predictions.length < 2) {
+        throw new Error('No current data available for this station.');
+      }
+      const points = json.predictions.map(p => ({
+        time: new Date(p.t.replace(' ', 'T')),
+        v: parseFloat(p.v)
+      }));
+
+      let lookupNow = now;
+      let heightFactor = 1;
+      if (sub) {
+        const avgTimeOffsetMin = (sub.highTimeOffsetMin + sub.lowTimeOffsetMin) / 2;
+        heightFactor = (sub.highHeightFactor + sub.lowHeightFactor) / 2;
+        lookupNow = new Date(now.getTime() - avgTimeOffsetMin * 60000);
+      }
+      const lookupPrev = new Date(lookupNow.getTime() - 10 * 60000);
+
+      const refPoints = points.map(p => ({ time: p.time, v: p.v }));
+      const refHeightNow = interpolateAt(refPoints, lookupNow);
+      const refHeightPrev = interpolateAt(refPoints, lookupPrev);
+      const currentHeight = refHeightNow * heightFactor;
+      const rising = refHeightNow > refHeightPrev;
+      const delta = Math.abs(refHeightNow - refHeightPrev) * heightFactor;
+
+      const arrow = rising ? '▲' : '▼';
+      const arrowClass = rising ? 'rising' : 'falling';
+      const trendLabel = rising ? 'Rising' : 'Falling';
+      const timeLabel = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+      nowWrap.style.display = 'flex';
+      nowWrap.innerHTML = `
+        <p class="tt-now-label">As of ${timeLabel}</p>
+        <span class="tt-now-value">${currentHeight.toFixed(2)} ft</span>
+        <span class="tt-now-arrow ${arrowClass}">${arrow}</span>
+        <span class="tt-now-trend">${trendLabel} · ~${delta.toFixed(2)} ft / 10 min</span>
+        <span class="tt-now-time">${sub ? 'Estimated from ' + sub.refName : 'Local station time'} (MLLW datum)</span>
+      `;
+    } catch (err) {
+      nowWrap.style.display = 'flex';
+      nowWrap.innerHTML = `<p class="tt-now-label">Now</p><span class="tt-now-trend">Unavailable — ${err.message}</span>`;
+    }
+  }
+
+  async function getTides() {
+    const stationId = stationSel.value === 'custom' ? customInput.value.trim() : stationSel.value;
+    const dateStr = dateInput.value;
+    if (!stationId) {
+      statusEl.textContent = 'Enter a NOAA station ID.';
+      statusEl.classList.add('error');
+      return;
+    }
+    if (!dateStr) {
+      statusEl.textContent = 'Pick a date.';
+      statusEl.classList.add('error');
+      return;
+    }
+
+    statusEl.classList.remove('error');
+    statusEl.textContent = 'Fetching tide predictions from NOAA…';
+    chartWrap.innerHTML = '';
+    tableWrap.innerHTML = '';
+
+    const sub = SUBORDINATE_STATIONS[stationId];
+    const fetchStationId = sub ? sub.refId : stationId;
+    const base = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
+
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const selDate = new Date(y, m - 1, d);
+    const beginDate = sub ? new Date(selDate.getTime() - 86400000) : selDate;
+    const endDate = sub ? new Date(selDate.getTime() + 86400000) : selDate;
+    const toApiStr = dt => `${dt.getFullYear()}${pad(dt.getMonth() + 1)}${pad(dt.getDate())}`;
+
+    const common = `station=${encodeURIComponent(fetchStationId)}&begin_date=${toApiStr(beginDate)}&end_date=${toApiStr(endDate)}&datum=MLLW&time_zone=lst_ldt&units=english&application=tide_chart_tool&format=json`;
+    const hourlyUrl = `${base}?product=predictions&interval=h&${common}`;
+    const hiloUrl = `${base}?product=predictions&interval=hilo&${common}`;
+
+    try {
+      const [hourlyRes, hiloRes, coords] = await Promise.all([
+        fetch(hourlyUrl),
+        fetch(hiloUrl),
+        getStationCoords(stationId)
+      ]);
+      const hourlyJson = await hourlyRes.json();
+      const hiloJson = await hiloRes.json();
+
+      if (hourlyJson.error) {
+        throw new Error(hourlyJson.error.message || 'NOAA API returned an error.');
+      }
+      if (!hourlyJson.predictions || hourlyJson.predictions.length === 0) {
+        throw new Error('No predictions returned. Check the station ID and date.');
+      }
+
+      const refHourlyPts = hourlyJson.predictions.map(p => ({
+        time: new Date(p.t.replace(' ', 'T')),
+        v: parseFloat(p.v)
+      }));
+      const refHiloPts = (hiloJson.predictions || []).map(p => ({
+        time: new Date(p.t.replace(' ', 'T')),
+        v: parseFloat(p.v),
+        type: p.type
+      }));
+
+      let hourly, hilo;
+
+      if (sub) {
+        const avgTimeOffsetMin = (sub.highTimeOffsetMin + sub.lowTimeOffsetMin) / 2;
+        const avgHeightFactor = (sub.highHeightFactor + sub.lowHeightFactor) / 2;
+
+        hourly = [];
+        for (let hh = 0; hh < 24; hh++) {
+          const localTime = new Date(y, m - 1, d, hh, 0, 0);
+          const refLookupTime = new Date(localTime.getTime() - avgTimeOffsetMin * 60000);
+          const refV = interpolateAt(refHourlyPts, refLookupTime);
+          const v = refV * avgHeightFactor;
+          const ampm = hh === 0 ? '12 AM' : hh < 12 ? `${hh} AM` : hh === 12 ? '12 PM' : `${hh - 12} PM`;
+          hourly.push({ hourLabel: ampm, v });
+        }
+
+        hilo = refHiloPts
+          .map(p => {
+            const factor = p.type === 'H' ? sub.highHeightFactor : sub.lowHeightFactor;
+            const offsetMin = p.type === 'H' ? sub.highTimeOffsetMin : sub.lowTimeOffsetMin;
+            const subTime = new Date(p.time.getTime() + offsetMin * 60000);
+            if (subTime.getFullYear() !== y || subTime.getMonth() !== m - 1 || subTime.getDate() !== d) return null;
+            const hourIndex = subTime.getHours() + subTime.getMinutes() / 60;
+            return { v: p.v * factor, type: p.type, hourIndex, timeLabel: fmtClock(subTime) };
+          })
+          .filter(Boolean);
+      } else {
+        hourly = refHourlyPts.map(p => {
+          const hh = p.time.getHours();
+          const ampm = hh === 0 ? '12 AM' : hh < 12 ? `${hh} AM` : hh === 12 ? '12 PM' : `${hh - 12} PM`;
+          return { hourLabel: ampm, v: p.v };
+        });
+        hilo = refHiloPts.map(p => ({
+          v: p.v,
+          type: p.type,
+          hourIndex: p.time.getHours() + p.time.getMinutes() / 60,
+          timeLabel: fmtClock(p.time)
+        }));
+      }
+
+      let sunSeg = [], moonSegs = [];
+      if (coords) {
+        const astro = await fetchAstronomy(coords.lat, coords.lng, dateStr);
+        sunSeg = sunSegments(astro);
+        moonSegs = moonSegments(astro);
+      }
+
+      let nowPoint = null;
+      const now = new Date();
+      if (dateStr === toLocalDateStr(now)) {
+        const hourFrac = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+        const idxLow = Math.min(22, Math.floor(hourFrac));
+        const idxHigh = idxLow + 1;
+        const frac = hourFrac - idxLow;
+        const v = hourly[idxLow].v + (hourly[idxHigh].v - hourly[idxLow].v) * frac;
+        nowPoint = { hourFrac, v };
+      }
+
+      const unit = 'ft';
+      chartWrap.innerHTML = buildChart(hourly, hilo, unit, { sunSeg, moonSegs, nowPoint });
+      const legendHtml = `<div class="tt-legend">
+        <span><span class="tt-dot" style="background:#3FA79E;"></span>High tide</span>
+        <span><span class="tt-dot" style="background:#E0A458;"></span>Low tide</span>
+        <span><span class="tt-swatch" style="background:var(--sun-yellow);"></span>Sun above horizon</span>
+        <span><span class="tt-swatch" style="background:var(--moon-blue);"></span>Moon above horizon</span>
+        ${nowPoint ? '<span><span class="tt-dot" style="background:var(--now-dot);"></span>Current time</span>' : ''}
+      </div>`;
+      chartWrap.insertAdjacentHTML('beforeend', legendHtml);
+      tableWrap.innerHTML = buildTable(hourly, unit);
+
+      const stationName = sub ? sub.name : (stationSel.value === 'custom' ? stationId : stationSel.options[stationSel.selectedIndex].text);
+      statusEl.textContent = sub
+        ? `Showing predictions for ${stationName} on ${dateStr} — estimated from the ${sub.refName} reference station using NOAA's published offsets (not an official NOAA prediction).`
+        : `Showing predictions for ${stationName} on ${dateStr} (local time, MLLW datum).`;
+      updateTideNow(stationId);
+    } catch (err) {
+      statusEl.classList.add('error');
+      statusEl.textContent = 'Could not load tide data: ' + err.message;
+    }
+  }
+
+  fetchBtn.addEventListener('click', getTides);
+  getTides();
+
+  // Refresh tide data (and the current-time dot / Tide Now readout) every 10 minutes.
+  setInterval(getTides, 10 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
