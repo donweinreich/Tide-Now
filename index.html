@@ -3,15 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>Tide Chart</title>
+<title>Tide Now</title>
 
-<!-- Makes it feel like a native app when added to the iPhone Home Screen -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Tide Chart">
+<meta name="apple-mobile-web-app-title" content="Tide Now">
 <meta name="theme-color" content="#0B2E4F">
 
-<!-- Home Screen icon (simple wave glyph, generated inline so no extra file is needed) -->
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='36' fill='%230B2E4F'/%3E%3Cpath d='M20 100 Q45 80 70 100 T120 100 T170 100' stroke='%233FA79E' stroke-width='10' fill='none' stroke-linecap='round'/%3E%3Cpath d='M20 130 Q45 110 70 130 T120 130 T170 130' stroke='%23E0A458' stroke-width='10' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,7 +21,6 @@
     margin: 0;
     padding: 0;
     background: #EDF3F2;
-    /* Respect the iPhone notch / home indicator safe areas */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
@@ -150,12 +147,12 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     color: var(--ink-soft);
-    margin-top: 6px;
+    margin-top: 14px;
     flex-wrap: wrap;
   }
   .tt-legend span { display: flex; align-items: center; gap: 5px; }
   .tt-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .tt-swatch { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
+  .tt-swatch { width: 14px; height: 6px; border-radius: 2px; display: inline-block; }
   table.tt-table {
     width: 100%;
     border-collapse: collapse;
@@ -183,6 +180,7 @@
     color: var(--ink-soft);
   }
   .tt-source a { color: var(--navy); }
+  
   .tt-now {
     margin: 4px 0 22px;
     padding: 18px 20px;
@@ -190,9 +188,32 @@
     border: 1px solid var(--line);
     border-radius: 4px;
     display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .tt-now-header {
+    display: flex;
+    justify-content: space-between;
     align-items: baseline;
+    width: 100%;
+  }
+  .tt-now-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+  .tt-now-metrics-left {
+    display: flex;
+    align-items: center;
     gap: 14px;
-    flex-wrap: wrap;
+  }
+  .tt-now-next {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy);
+    text-align: right;
   }
   .tt-now-label {
     font-family: 'JetBrains Mono', monospace;
@@ -201,8 +222,7 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--navy);
-    flex-basis: 100%;
-    margin: 0 0 4px;
+    margin: 0;
   }
   .tt-now-value {
     font-family: 'Fraunces', Georgia, serif;
@@ -223,12 +243,13 @@
     font-size: 17px;
     font-weight: 700;
     color: var(--ink);
+    line-height: 1;
+    text-align: right;
   }
   .tt-now-time {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
     color: var(--ink-soft);
-    flex-basis: 100%;
   }
 </style>
 
@@ -236,7 +257,7 @@
   <div class="tt-card">
     <div class="tt-header">
       <p class="tt-eyebrow">NOAA · CO-OPS Tide Predictions</p>
-      <h1 class="tt-title">Tide Chart</h1>
+      <h1 class="tt-title">Tide Now</h1>
       <p class="tt-sub">Hourly water height, sun &amp; moon position, and live tide status</p>
     </div>
 
@@ -272,7 +293,7 @@
       <div class="tt-now" id="tt-now-wrap" style="display:none;"></div>
       <div class="tt-chart-wrap" id="tt-chart-wrap"></div>
       <div id="tt-table-wrap"></div>
-      <p class="tt-source">Source: NOAA Tides &amp; Currents CO-OPS API (MLLW datum) and sunrisesunset.io for sun/moon times. Predictions only, not real-time observations. Auto-refreshes every 10 minutes.</p>
+      <p class="tt-source">Source: NOAA Tides &amp; Currents CO-OPS API (MLLW datum). Solar and Lunar position tracks calculated locally. Predictions only, not real-time observations. Auto-refreshes every 10 minutes.</p>
     </div>
   </div>
 </div>
@@ -289,6 +310,18 @@
   const nowWrap = document.getElementById('tt-now-wrap');
   const tableWrap = document.getElementById('tt-table-wrap');
 
+  const STATION_COORDS = {
+    '8413564': { lat: 44.2794, lng: -68.3103 },
+    '8413320': { lat: 44.3922, lng: -68.2044 },
+    '8411060': { lat: 44.6567, lng: -67.2033 },
+    '8410140': { lat: 44.9044, lng: -66.9853 },
+    '8418150': { lat: 43.6567, lng: -70.2467 },
+    '8419317': { lat: 43.3200, lng: -70.5633 },
+    '8443970': { lat: 42.3539, lng: -71.0531 },
+    '8447930': { lat: 41.5236, lng: -70.6722 },
+    '8518750': { lat: 40.7006, lng: -74.0142 }
+  };
+
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function toLocalDateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
   function fmtClock(d) {
@@ -299,6 +332,15 @@
     if (hh === 0) hh = 12;
     return `${hh}:${mm} ${ampm}`;
   }
+  function fmtHourFloat(hourFloat) {
+    let h = Math.floor(hourFloat) % 24;
+    if (h < 0) h += 24;
+    let m = Math.round((hourFloat - Math.floor(hourFloat)) * 60);
+    if (m === 60) { m = 0; h = (h + 1) % 24; }
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const displayH = h % 12 === 0 ? 12 : h % 12;
+    return `${displayH}:${pad(m)} ${ampm}`;
+  }
 
   dateInput.value = toLocalDateStr(new Date());
 
@@ -306,9 +348,6 @@
     customWrap.style.display = stationSel.value === 'custom' ? 'flex' : 'none';
   });
 
-  // Some NOAA stations (e.g. Southwest Harbor) are "subordinate stations":
-  // they don't have their own harmonic predictions in the API, only a
-  // published time/height offset from a nearby reference station.
   const SUBORDINATE_STATIONS = {
     '8413564': {
       name: 'Southwest Harbor, ME',
@@ -320,8 +359,6 @@
       lowHeightFactor: 0.95
     }
   };
-
-  const stationCoordsCache = {};
 
   function interpolateAt(points, targetDate) {
     if (targetDate <= points[0].time) return points[0].v;
@@ -336,86 +373,77 @@
     return points[points.length - 1].v;
   }
 
-  async function getStationCoords(stationId) {
-    if (stationCoordsCache[stationId]) return stationCoordsCache[stationId];
-    try {
-      const res = await fetch(`https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/${stationId}.json`);
-      const json = await res.json();
-      const st = json.stations && json.stations[0];
-      if (!st) return null;
-      const coords = { lat: st.lat, lng: st.lng };
-      stationCoordsCache[stationId] = coords;
-      return coords;
-    } catch (e) {
-      return null;
+  function getAstronomyTracks(lat, dateObj) {
+    const start = new Date(dateObj.getFullYear(), 0, 0);
+    const diff = dateObj - start;
+    const oneDay = 1000 * 60 * 60 * 24;
+    const dayOfYear = Math.floor(diff / oneDay);
+
+    const d2r = Math.PI / 180;
+    const r2d = 180 / Math.PI;
+    const decl = 23.45 * Math.sin(d2r * (360 / 365 * (284 + dayOfYear)));
+    
+    let hourAngleDeg = 90;
+    const cosH = -Math.tan(lat * d2r) * Math.tan(decl * d2r);
+    if (cosH >= -1 && cosH <= 1) hourAngleDeg = Math.acos(cosH) * r2d;
+    const durationHours = (hourAngleDeg / 15) * 2;
+    
+    const month = dateObj.getMonth();
+    const isDST = (month > 2 && month < 10);
+    const solarNoon = isDST ? 13.1 : 12.1; 
+    
+    const sunrise = Math.max(0, solarNoon - (durationHours / 2));
+    const sunset = Math.min(24, solarNoon + (durationHours / 2));
+
+    const baseNewMoon = new Date(2000, 0, 6, 18, 14, 0);
+    const msPerCycle = 29.53059 * 24 * 60 * 60 * 1000;
+    const ageMs = Math.abs(dateObj.getTime() - baseNewMoon.getTime()) % msPerCycle;
+    const ageDays = ageMs / (1000 * 60 * 60 * 24);
+
+    const MOON_PHASE_EMOJI = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'];
+    const phaseSegment = 29.53059 / 8;
+    const phaseIndex = Math.floor((ageDays + phaseSegment / 2) / phaseSegment) % 8;
+    const moonPhaseEmoji = MOON_PHASE_EMOJI[phaseIndex];
+    
+    let moonrise = (6 + ageDays * 0.83) % 24;
+    let moonset = (18 + ageDays * 0.83) % 24;
+    if (isDST) {
+      moonrise = (moonrise + 1) % 24;
+      moonset = (moonset + 1) % 24;
     }
+
+    const sunSeg = [[sunrise, sunset]];
+    const moonSegs = (moonrise < moonset) ? [[moonrise, moonset]] : [[0, moonset], [moonrise, 24]];
+
+    return { sunSeg, moonSegs, sunrise, sunset, moonrise, moonset, moonPhaseEmoji };
   }
 
-  function parseHM(s) {
-    if (!s) return null;
-    const parts = s.split(':').map(Number);
-    const hh = parts[0], mm = parts[1] || 0, ss = parts[2] || 0;
-    return hh + mm / 60 + ss / 3600;
-  }
-
-  async function fetchAstronomy(lat, lng, dateStr) {
-    try {
-      const url = `https://api.sunrisesunset.io/json?lat=${lat}&lng=${lng}&date=${dateStr}&time_format=24`;
-      const res = await fetch(url);
-      const json = await res.json();
-      if (json.status !== 'OK') return null;
-      const r = json.results;
-      return {
-        sunrise: parseHM(r.sunrise),
-        sunset: parseHM(r.sunset),
-        moonrise: parseHM(r.moonrise),
-        moonset: parseHM(r.moonset)
-      };
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function sunSegments(astro) {
-    if (!astro || astro.sunrise == null || astro.sunset == null) return [];
-    if (astro.sunrise <= astro.sunset) return [[astro.sunrise, astro.sunset]];
-    return [];
-  }
-
-  function moonSegments(astro) {
-    if (!astro) return [];
-    const { moonrise, moonset } = astro;
-    if (moonrise != null && moonset != null) {
-      if (moonrise < moonset) return [[moonrise, moonset]];
-      return [[0, moonset], [moonrise, 24]];
-    } else if (moonrise == null && moonset != null) {
-      return [[0, moonset]];
-    } else if (moonset == null && moonrise != null) {
-      return [[moonrise, 24]];
-    }
-    return [];
-  }
-
-  function buildChart(hourly, hilo, unit, extras) {
-    extras = extras || {};
+  function renderChartContent(hourly, hilo, unit, extras) {
     const sunSeg = extras.sunSeg || [];
     const moonSegs = extras.moonSegs || [];
     const nowPoint = extras.nowPoint || null;
+    const { sunrise, sunset, moonrise, moonset, moonPhaseEmoji } = extras;
 
     const w = 700;
     const padL = 42, padR = 16, padT = 36;
     const plotH = 170;
     const chartBottomY = padT + plotH;
-    const hourLabelY = chartBottomY + 16;
-    const sunTrackY = hourLabelY + 14;
-    const moonTrackY = sunTrackY + 20;
-    const svgH = moonTrackY + 18;
+    
+    const hourLabelY = chartBottomY + 20;
+    const lowTideTrackY = hourLabelY + 24;
+    const lowTideLabelY = lowTideTrackY + 24;
+    const sunTrackY = lowTideLabelY + 16;
+    const sunLabelY = sunTrackY + 24;
+    const moonTrackY = sunLabelY + 16;
+    const moonLabelY = moonTrackY + 24;
+    const svgH = moonLabelY + 20;
 
     const heights = hourly.map(p => p.v);
     const minV = Math.min(...heights, ...hilo.map(p => p.v)) - 0.5;
     const maxV = Math.max(...heights, ...hilo.map(p => p.v)) + 0.5;
     const xFor = i => padL + (i / (hourly.length - 1)) * (w - padL - padR);
     const yFor = v => padT + (1 - (v - minV) / (maxV - minV)) * plotH;
+    const xForHour = t => padL + (t / 24) * (w - padL - padR);
 
     let path = '';
     hourly.forEach((p, i) => {
@@ -438,14 +466,11 @@
 
     let hiloMarks = '';
     hilo.forEach(p => {
-      const x = padL + (p.hourIndex / (hourly.length - 1)) * (w - padL - padR);
+      const x = padL + (p.hourIndex / 24) * (w - padL - padR);
       const y = yFor(p.v);
       const color = p.type === 'H' ? '#3FA79E' : '#E0A458';
       hiloMarks += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
-      hiloMarks += `<text x="${x.toFixed(1)}" y="${(y - 24).toFixed(1)}" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="${color}" text-anchor="middle">${p.v.toFixed(2)}${unit}</text>`;
-      if (p.timeLabel) {
-        hiloMarks += `<text x="${x.toFixed(1)}" y="${(y - 11).toFixed(1)}" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600" fill="${color}" text-anchor="middle">${p.timeLabel}</text>`;
-      }
+      hiloMarks += `<text x="${x.toFixed(1)}" y="${(y - 14).toFixed(1)}" font-family="JetBrains Mono, monospace" font-size="18" font-weight="700" fill="${color}" text-anchor="middle">${p.v.toFixed(2)}${unit}</text>`;
     });
 
     let yTicks = '';
@@ -457,21 +482,70 @@
       yTicks += `<text x="${padL - 8}" y="${y + 3}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="end">${v.toFixed(1)}</text>`;
     }
 
-    const xForHour = t => padL + (t / (hourly.length - 1)) * (w - padL - padR);
+    let trackBackgrounds = `
+      <line x1="${padL}" y1="${lowTideTrackY}" x2="${w-padR}" y2="${lowTideTrackY}" stroke="#E5EDEC" stroke-width="6" stroke-linecap="round"/>
+      <line x1="${padL}" y1="${sunTrackY}" x2="${w-padR}" y2="${sunTrackY}" stroke="#E5EDEC" stroke-width="6" stroke-linecap="round"/>
+      <line x1="${padL}" y1="${moonTrackY}" x2="${w-padR}" y2="${moonTrackY}" stroke="#E5EDEC" stroke-width="6" stroke-linecap="round"/>
+    `;
 
-    let sunTrack = `<line x1="${padL}" y1="${sunTrackY}" x2="${w-padR}" y2="${sunTrackY}" stroke="#E5EDEC" stroke-width="5" stroke-linecap="round"/>`;
+    let lowTideSegments = '';
+    hilo.filter(p => p.type === 'L').forEach(p => {
+      const startHour = Math.max(0, p.hourIndex - 2);
+      const endHour = Math.min(24, p.hourIndex + 2);
+      const x1 = xForHour(startHour), x2 = xForHour(endHour);
+      lowTideSegments += `<line x1="${x1.toFixed(1)}" y1="${lowTideTrackY}" x2="${x2.toFixed(1)}" y2="${lowTideTrackY}" stroke="#F0A8C4" stroke-width="6" stroke-linecap="round"/>`;
+      
+      const startMin = Math.round((startHour % 1) * 60);
+      const startH = Math.floor(startHour);
+      const endMin = Math.round((endHour % 1) * 60);
+      const endH = Math.floor(endHour);
+      
+      const fmtLabel = (h, m) => {
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const displayH = h % 12 === 0 ? 12 : h % 12;
+        return `${displayH}:${pad(m)} ${ampm}`;
+      };
+
+      const timeRangeStr = `${fmtLabel(startH, startMin)} - ${fmtLabel(endH, endMin)}`;
+      lowTideSegments += `<text x="${((x1 + x2) / 2).toFixed(1)}" y="${lowTideLabelY}" font-family="JetBrains Mono, monospace" font-size="18" font-weight="700" fill="#8A2F4F" text-anchor="middle">${timeRangeStr}</text>`;
+    });
+
+    let sunSegmentsStr = '';
     sunSeg.forEach(seg => {
       const x1 = xForHour(seg[0]), x2 = xForHour(seg[1]);
-      sunTrack += `<line x1="${x1.toFixed(1)}" y1="${sunTrackY}" x2="${x2.toFixed(1)}" y2="${sunTrackY}" stroke="var(--sun-yellow)" stroke-width="5" stroke-linecap="round"/>`;
+      sunSegmentsStr += `<line x1="${x1.toFixed(1)}" y1="${sunTrackY}" x2="${x2.toFixed(1)}" y2="${sunTrackY}" stroke="var(--sun-yellow)" stroke-width="6" stroke-linecap="round"/>`;
     });
-    sunTrack += `<text x="${padL - 8}" y="${sunTrackY + 3}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="end">Sun</text>`;
+    let sunLabelStr = '';
+    if (sunrise != null && sunset != null) {
+      const sunCenterX = xForHour((sunrise + sunset) / 2);
+      const sunTimeStr = `${fmtHourFloat(sunrise)} - ${fmtHourFloat(sunset)}`;
+      sunLabelStr = `<text x="${sunCenterX.toFixed(1)}" y="${sunLabelY}" font-family="JetBrains Mono, monospace" font-size="18" font-weight="700" fill="#7A5A0A" text-anchor="middle">${sunTimeStr}</text>`;
+    }
 
-    let moonTrack = `<line x1="${padL}" y1="${moonTrackY}" x2="${w-padR}" y2="${moonTrackY}" stroke="#E5EDEC" stroke-width="5" stroke-linecap="round"/>`;
+    let moonSegmentsStr = '';
     moonSegs.forEach(seg => {
       const x1 = xForHour(seg[0]), x2 = xForHour(seg[1]);
-      moonTrack += `<line x1="${x1.toFixed(1)}" y1="${moonTrackY}" x2="${x2.toFixed(1)}" y2="${moonTrackY}" stroke="var(--moon-blue)" stroke-width="5" stroke-linecap="round"/>`;
+      moonSegmentsStr += `<line x1="${x1.toFixed(1)}" y1="${moonTrackY}" x2="${x2.toFixed(1)}" y2="${moonTrackY}" stroke="var(--moon-blue)" stroke-width="6" stroke-linecap="round"/>`;
     });
-    moonTrack += `<text x="${padL - 8}" y="${moonTrackY + 3}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="end">Moon</text>`;
+    let moonLabelStr = '';
+    if (moonrise != null && moonset != null) {
+      let moonCenterHour;
+      if (moonrise < moonset) {
+        moonCenterHour = (moonrise + moonset) / 2;
+      } else {
+        const span = (moonset + 24) - moonrise;
+        moonCenterHour = (moonrise + span / 2) % 24;
+      }
+      const moonCenterX = Math.max(padL + 50, Math.min(w - padR - 50, xForHour(moonCenterHour)));
+      const moonTimeStr = `${fmtHourFloat(moonrise)} - ${fmtHourFloat(moonset)}`;
+      moonLabelStr = `<text x="${moonCenterX.toFixed(1)}" y="${moonLabelY}" font-family="JetBrains Mono, monospace" font-size="18" font-weight="700" fill="#33586B" text-anchor="middle">${moonTimeStr}</text>`;
+    }
+
+    let trackLabels = `
+      <text x="${padL - 8}" y="${lowTideTrackY + 3}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="end">±2h Low</text>
+      <text x="${padL - 8}" y="${sunTrackY + 5}" font-size="14" text-anchor="end">☀</text>
+      <text x="${padL - 8}" y="${moonTrackY + 5}" font-size="14" text-anchor="end">${moonPhaseEmoji}</text>
+    `;
 
     let nowMark = '';
     if (nowPoint) {
@@ -489,8 +563,13 @@
       <path d="${path}" fill="none" stroke="#0B2E4F" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>
       ${hiloMarks}
       ${nowMark}
-      ${sunTrack}
-      ${moonTrack}
+      ${trackBackgrounds}
+      ${lowTideSegments}
+      ${sunSegmentsStr}
+      ${moonSegmentsStr}
+      ${trackLabels}
+      ${sunLabelStr}
+      ${moonLabelStr}
     </svg>`;
   }
 
@@ -502,6 +581,40 @@
       <thead><tr><th>Hour</th><th>Predicted Height</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
+  }
+
+  async function getNextHiLo(stationId) {
+    const sub = SUBORDINATE_STATIONS[stationId];
+    const fetchStationId = sub ? sub.refId : stationId;
+    const base = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today.getTime() + 86400000);
+    const toApiStr = dt => `${dt.getFullYear()}${pad(dt.getMonth() + 1)}${pad(dt.getDate())}`;
+    const url = `${base}?product=predictions&interval=hilo&station=${encodeURIComponent(fetchStationId)}&begin_date=${toApiStr(today)}&end_date=${toApiStr(tomorrow)}&datum=MLLW&time_zone=lst_ldt&units=english&application=tide_chart_tool&format=json`;
+
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
+      if (!json.predictions) return { nextHigh: null, nextLow: null };
+
+      const points = json.predictions.map(p => {
+        const rawTime = new Date(p.t.replace(' ', 'T'));
+        const rawV = parseFloat(p.v);
+        if (sub) {
+          const factor = p.type === 'H' ? sub.highHeightFactor : sub.lowHeightFactor;
+          const offsetMin = p.type === 'H' ? sub.highTimeOffsetMin : sub.lowTimeOffsetMin;
+          return { time: new Date(rawTime.getTime() + offsetMin * 60000), v: rawV * factor, type: p.type };
+        }
+        return { time: rawTime, v: rawV, type: p.type };
+      }).sort((a, b) => a.time - b.time);
+
+      const nextHigh = points.find(p => p.type === 'H' && p.time > now) || null;
+      const nextLow = points.find(p => p.type === 'L' && p.time > now) || null;
+      return { nextHigh, nextLow };
+    } catch (e) {
+      return { nextHigh: null, nextLow: null };
+    }
   }
 
   async function updateTideNow(stationId) {
@@ -531,31 +644,53 @@
         heightFactor = (sub.highHeightFactor + sub.lowHeightFactor) / 2;
         lookupNow = new Date(now.getTime() - avgTimeOffsetMin * 60000);
       }
-      const lookupPrev = new Date(lookupNow.getTime() - 10 * 60000);
+      
+      const lookupPrev = new Date(lookupNow.getTime() - 15 * 60 * 1000);
 
       const refPoints = points.map(p => ({ time: p.time, v: p.v }));
       const refHeightNow = interpolateAt(refPoints, lookupNow);
       const refHeightPrev = interpolateAt(refPoints, lookupPrev);
       const currentHeight = refHeightNow * heightFactor;
       const rising = refHeightNow > refHeightPrev;
-      const delta = Math.abs(refHeightNow - refHeightPrev) * heightFactor;
+      
+      const deltaFeet = Math.abs(refHeightNow - refHeightPrev) * heightFactor;
+      const deltaInchesRounded = Math.round(deltaFeet * 12);
 
       const arrow = rising ? '▲' : '▼';
       const arrowClass = rising ? 'rising' : 'falling';
       const trendLabel = rising ? 'Rising' : 'Falling';
       const timeLabel = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
+      const { nextHigh, nextLow } = await getNextHiLo(stationId);
+      const nextHighStr = nextHigh ? `High @ ${fmtClock(nextHigh.time)} (${nextHigh.v.toFixed(2)} ft)` : 'High @ —';
+      const nextLowStr = nextLow ? `Low @ ${fmtClock(nextLow.time)} (${nextLow.v.toFixed(2)} ft)` : 'Low @ —';
+      let nextHiLoStr;
+      if (nextHigh && nextLow) {
+        nextHiLoStr = nextHigh.time <= nextLow.time
+          ? `${nextHighStr} / ${nextLowStr}`
+          : `${nextLowStr} / ${nextHighStr}`;
+      } else {
+        nextHiLoStr = nextHigh ? nextHighStr : nextLowStr;
+      }
+
       nowWrap.style.display = 'flex';
       nowWrap.innerHTML = `
-        <p class="tt-now-label">As of ${timeLabel}</p>
-        <span class="tt-now-value">${currentHeight.toFixed(2)} ft</span>
-        <span class="tt-now-arrow ${arrowClass}">${arrow}</span>
-        <span class="tt-now-trend">${trendLabel} · ~${delta.toFixed(2)} ft / 10 min</span>
+        <div class="tt-now-header">
+          <p class="tt-now-label">As of ${timeLabel}</p>
+          <div class="tt-now-next">${nextHiLoStr}</div>
+        </div>
+        <div class="tt-now-main">
+          <div class="tt-now-metrics-left">
+            <span class="tt-now-value">${currentHeight.toFixed(2)} ft</span>
+            <span class="tt-now-arrow ${arrowClass}">${arrow}</span>
+          </div>
+          <div class="tt-now-trend">${trendLabel} · ~${deltaInchesRounded} in / 15 min</div>
+        </div>
         <span class="tt-now-time">${sub ? 'Estimated from ' + sub.refName : 'Local station time'} (MLLW datum)</span>
       `;
     } catch (err) {
       nowWrap.style.display = 'flex';
-      nowWrap.innerHTML = `<p class="tt-now-label">Now</p><span class="tt-now-trend">Unavailable — ${err.message}</span>`;
+      nowWrap.innerHTML = `<div class="tt-now-header"><p class="tt-now-label">Now</p></div><div class="tt-now-main"><span class="tt-now-trend">Unavailable — ${err.message}</span></div>`;
     }
   }
 
@@ -593,10 +728,9 @@
     const hiloUrl = `${base}?product=predictions&interval=hilo&${common}`;
 
     try {
-      const [hourlyRes, hiloRes, coords] = await Promise.all([
+      const [hourlyRes, hiloRes] = await Promise.all([
         fetch(hourlyUrl),
-        fetch(hiloUrl),
-        getStationCoords(stationId)
+        fetch(hiloUrl)
       ]);
       const hourlyJson = await hourlyRes.json();
       const hiloJson = await hiloRes.json();
@@ -658,13 +792,6 @@
         }));
       }
 
-      let sunSeg = [], moonSegs = [];
-      if (coords) {
-        const astro = await fetchAstronomy(coords.lat, coords.lng, dateStr);
-        sunSeg = sunSegments(astro);
-        moonSegs = moonSegments(astro);
-      }
-
       let nowPoint = null;
       const now = new Date();
       if (dateStr === toLocalDateStr(now)) {
@@ -676,11 +803,16 @@
         nowPoint = { hourFrac, v };
       }
 
+      const coordFallback = STATION_COORDS[stationId] || { lat: 44.39, lng: -68.20 };
+      const { sunSeg, moonSegs, sunrise, sunset, moonrise, moonset, moonPhaseEmoji } = getAstronomyTracks(coordFallback.lat, selDate);
+
       const unit = 'ft';
-      chartWrap.innerHTML = buildChart(hourly, hilo, unit, { sunSeg, moonSegs, nowPoint });
+      chartWrap.innerHTML = renderChartContent(hourly, hilo, unit, { sunSeg, moonSegs, nowPoint, sunrise, sunset, moonrise, moonset, moonPhaseEmoji });
+      
       const legendHtml = `<div class="tt-legend">
         <span><span class="tt-dot" style="background:#3FA79E;"></span>High tide</span>
         <span><span class="tt-dot" style="background:#E0A458;"></span>Low tide</span>
+        <span><span class="tt-swatch" style="background:#F0A8C4;"></span>±2 hrs around low tide</span>
         <span><span class="tt-swatch" style="background:var(--sun-yellow);"></span>Sun above horizon</span>
         <span><span class="tt-swatch" style="background:var(--moon-blue);"></span>Moon above horizon</span>
         ${nowPoint ? '<span><span class="tt-dot" style="background:var(--now-dot);"></span>Current time</span>' : ''}
@@ -690,8 +822,9 @@
 
       const stationName = sub ? sub.name : (stationSel.value === 'custom' ? stationId : stationSel.options[stationSel.selectedIndex].text);
       statusEl.textContent = sub
-        ? `Showing predictions for ${stationName} on ${dateStr} — estimated from the ${sub.refName} reference station using NOAA's published offsets (not an official NOAA prediction).`
+        ? `Showing predictions for ${stationName} on ${dateStr} — estimated from the ${sub.refName} reference station using NOAA's published offsets.`
         : `Showing predictions for ${stationName} on ${dateStr} (local time, MLLW datum).`;
+      
       updateTideNow(stationId);
     } catch (err) {
       statusEl.classList.add('error');
@@ -702,7 +835,6 @@
   fetchBtn.addEventListener('click', getTides);
   getTides();
 
-  // Refresh tide data (and the current-time dot / Tide Now readout) every 10 minutes.
   setInterval(getTides, 10 * 60 * 1000);
 })();
 </script>
