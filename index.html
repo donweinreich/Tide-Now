@@ -14,7 +14,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600;700&family=Quantico:ital,wght@1,700&display=swap" rel="stylesheet">
 
 <style>
   html, body {
@@ -180,6 +180,17 @@
     color: var(--ink-soft);
   }
   .tt-source a { color: var(--navy); }
+  .tt-footer-legal {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    text-align: center;
+    line-height: 1.6;
+  }
   
   .tt-now {
     margin: 4px 0 22px;
@@ -219,15 +230,17 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 15px;
     font-weight: 700;
+    font-style: italic;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--navy);
     margin: 0;
   }
   .tt-now-value {
-    font-family: 'Fraunces', Georgia, serif;
+    font-family: 'Quantico', 'Arial Narrow', sans-serif;
     font-size: 40px;
-    font-weight: 600;
+    font-weight: 700;
+    font-style: italic;
     color: var(--navy);
     line-height: 1;
   }
@@ -242,6 +255,7 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 17px;
     font-weight: 700;
+    font-style: italic;
     color: var(--ink);
     line-height: 1;
     text-align: right;
@@ -294,6 +308,7 @@
       <div class="tt-chart-wrap" id="tt-chart-wrap"></div>
       <div id="tt-table-wrap"></div>
       <p class="tt-source">Source: NOAA Tides &amp; Currents CO-OPS API (MLLW datum). Solar and Lunar position tracks calculated locally. Predictions only, not real-time observations. Auto-refreshes every 10 minutes.</p>
+      <p class="tt-footer-legal">NOT FOR NAVIGATION<br>© 2026 Don Weinreich</p>
     </div>
   </div>
 </div>
@@ -432,18 +447,46 @@
     const hourLabelY = chartBottomY + 20;
     const lowTideTrackY = hourLabelY + 24;
     const lowTideLabelY = lowTideTrackY + 24;
-    const sunTrackY = lowTideLabelY + 16;
+    const sunTrackY = lowTideLabelY + 22;
     const sunLabelY = sunTrackY + 24;
-    const moonTrackY = sunLabelY + 16;
+    const moonTrackY = sunLabelY + 22;
     const moonLabelY = moonTrackY + 24;
     const svgH = moonLabelY + 20;
 
     const heights = hourly.map(p => p.v);
-    const minV = Math.min(...heights, ...hilo.map(p => p.v)) - 0.5;
+    const minV = Math.min(...heights, ...hilo.map(p => p.v)) - 2.5;
     const maxV = Math.max(...heights, ...hilo.map(p => p.v)) + 0.5;
     const xFor = i => padL + (i / (hourly.length - 1)) * (w - padL - padR);
     const yFor = v => padT + (1 - (v - minV) / (maxV - minV)) * plotH;
     const xForHour = t => padL + (t / 24) * (w - padL - padR);
+
+    // Interpolates the curve's value at any fractional hour, using the same
+    // index convention as xFor/hourly, so a pink overlay segment lines up
+    // exactly with the main curve beneath it (no visible seam).
+    function valueAtHour(hourFloat) {
+      const maxIdx = hourly.length - 1;
+      const clamped = Math.max(0, Math.min(maxIdx, hourFloat));
+      const idx = Math.floor(clamped);
+      const idxNext = Math.min(maxIdx, idx + 1);
+      const frac = clamped - idx;
+      return hourly[idx].v + (hourly[idxNext].v - hourly[idx].v) * frac;
+    }
+
+    // Builds a path tracing the exact same line as the main curve, but only
+    // across [startHour, endHour] — used to redraw that stretch in pink.
+    function buildCurveSegmentPath(startHour, endHour) {
+      const hoursToPlot = [startHour];
+      const firstInt = Math.ceil(startHour + 1e-9);
+      const lastInt = Math.floor(endHour - 1e-9);
+      for (let hh = firstInt; hh <= lastInt; hh++) hoursToPlot.push(hh);
+      hoursToPlot.push(endHour);
+      let d = '';
+      hoursToPlot.forEach((hourVal, i) => {
+        const x = xFor(hourVal), y = yFor(valueAtHour(hourVal));
+        d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+      });
+      return d;
+    }
 
     let path = '';
     hourly.forEach((p, i) => {
@@ -456,7 +499,7 @@
     for (let i = 0; i < hourly.length; i += hourStep) {
       const x = xFor(i);
       gridLines += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${chartBottomY}" stroke="#C7D6D4" stroke-width="1" stroke-dasharray="2,3"/>`;
-      gridLines += `<text x="${x}" y="${hourLabelY}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="middle">${hourly[i].hourLabel}</text>`;
+      gridLines += `<text x="${x}" y="${hourLabelY}" font-family="JetBrains Mono, monospace" font-size="15" fill="#567077" text-anchor="middle">${hourly[i].hourLabel}</text>`;
     }
 
     const zeroY = yFor(0);
@@ -468,9 +511,13 @@
     hilo.forEach(p => {
       const x = padL + (p.hourIndex / 24) * (w - padL - padR);
       const y = yFor(p.v);
-      const color = p.type === 'H' ? '#3FA79E' : '#E0A458';
-      hiloMarks += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
-      hiloMarks += `<text x="${x.toFixed(1)}" y="${(y - 14).toFixed(1)}" font-family="JetBrains Mono, monospace" font-size="18" font-weight="700" fill="${color}" text-anchor="middle">${p.v.toFixed(2)}${unit}</text>`;
+      const dotColor = p.type === 'H' ? '#3FA79E' : '#E0A458';
+      const labelColor = p.type === 'H' ? '#1F6B5C' : '#8A5A1E';
+      hiloMarks += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${dotColor}" stroke="#fff" stroke-width="1.5"/>`;
+      const labelY = p.type === 'L'
+        ? Math.min(y + 22, hourLabelY - 16)
+        : y - 14;
+      hiloMarks += `<text x="${x.toFixed(1)}" y="${labelY.toFixed(1)}" font-family="JetBrains Mono, monospace" font-size="18" font-weight="700" fill="${labelColor}" text-anchor="middle">${p.v.toFixed(2)}${unit}</text>`;
     });
 
     let yTicks = '';
@@ -479,7 +526,7 @@
       const v = minV + (i / ticks) * (maxV - minV);
       const y = yFor(v);
       yTicks += `<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#E5EDEC" stroke-width="1"/>`;
-      yTicks += `<text x="${padL - 8}" y="${y + 3}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="end">${v.toFixed(1)}</text>`;
+      yTicks += `<text x="${padL - 8}" y="${y + 3}" font-family="JetBrains Mono, monospace" font-size="15" fill="#567077" text-anchor="end">${v.toFixed(1)}</text>`;
     }
 
     let trackBackgrounds = `
@@ -489,11 +536,13 @@
     `;
 
     let lowTideSegments = '';
+    let pinkCurveSegments = '';
     hilo.filter(p => p.type === 'L').forEach(p => {
       const startHour = Math.max(0, p.hourIndex - 2);
       const endHour = Math.min(24, p.hourIndex + 2);
       const x1 = xForHour(startHour), x2 = xForHour(endHour);
       lowTideSegments += `<line x1="${x1.toFixed(1)}" y1="${lowTideTrackY}" x2="${x2.toFixed(1)}" y2="${lowTideTrackY}" stroke="#F0A8C4" stroke-width="6" stroke-linecap="round"/>`;
+      pinkCurveSegments += `<path d="${buildCurveSegmentPath(startHour, endHour)}" fill="none" stroke="#F0A8C4" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>`;
       
       const startMin = Math.round((startHour % 1) * 60);
       const startH = Math.floor(startHour);
@@ -543,8 +592,8 @@
 
     let trackLabels = `
       <text x="${padL - 8}" y="${lowTideTrackY + 3}" font-family="JetBrains Mono, monospace" font-size="10" fill="#567077" text-anchor="end">±2h Low</text>
-      <text x="${padL - 8}" y="${sunTrackY + 5}" font-size="14" text-anchor="end">☀</text>
-      <text x="${padL - 8}" y="${moonTrackY + 5}" font-size="14" text-anchor="end">${moonPhaseEmoji}</text>
+      <text x="${padL - 8}" y="${sunTrackY + 7}" font-size="21" text-anchor="end">☀</text>
+      <text x="${padL - 8}" y="${moonTrackY + 7}" font-size="21" text-anchor="end">${moonPhaseEmoji}</text>
     `;
 
     let nowMark = '';
@@ -560,7 +609,8 @@
       ${yTicks}
       ${gridLines}
       ${zeroLine}
-      <path d="${path}" fill="none" stroke="#0B2E4F" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${path}" fill="none" stroke="#0B2E4F" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${pinkCurveSegments}
       ${hiloMarks}
       ${nowMark}
       ${trackBackgrounds}
@@ -676,7 +726,7 @@
       nowWrap.style.display = 'flex';
       nowWrap.innerHTML = `
         <div class="tt-now-header">
-          <p class="tt-now-label">As of ${timeLabel}</p>
+          <p class="tt-now-label">@ ${timeLabel}</p>
           <div class="tt-now-next">${nextHiLoStr}</div>
         </div>
         <div class="tt-now-main">
